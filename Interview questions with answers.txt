@@ -1,0 +1,1392 @@
+	Interview questions with answers
+       ==================================
+1. what is lvm? explain about lvm ?
+
+   LVM means Logical volume manager. By using LVM we can do the disk management like creating partitions, extending partition space, reduce the partition space,
+   we can take the backup of partition all these things we can do with LVM.
+   There will be no down time when we are extending partition, directly we can extend the space without interupting any transcations.
+   In LVM we can divide 29990 partitions.
+
+2. what is umask? what is the default umask for root and normal users?
+   
+   Umask is a permission default controller.By changing this umask value we can control the default permissions.
+   Here, for root user umask value is 022 and for normal user umask value is 002
+
+3. what is sticky bit? on which directory by default sticky bit will be appied?
+  
+   sticky bit comes under special permissions, using sticky bit we can provide full access to everyone but each other should not delete others files.
+   t = sticky bit
+  +t means applying the sticky bit
+  -t means removing sticky bit permissions
+   
+   By default sticky bit applied on /tmp directory.
+
+4. what is ACL?
+  
+  ACL means Access control list, using acl we can provide individual users access. access will be in control by using acl . 
+  To whom we are providing read permissions, to which user we are giving read/write permissions all these access will be in control.
+  
+  Here setfacl is for providing access for users & getfacl is for list out acl permissions on directory.
+
+5. How your doing patching in your organization? explaing the patchig proccedure?
+
+Step 1 : we have change management team who will schedule meeting for the patching activity.
+	we join in scheduled meeting and start the activity
+	some times we co-ordinate with application team over the mail
+	we send mail to stop the application once they stop the application then we start the OS patching activity
+
+step 2 : we take the snapshot for scheduled servers
+	then
+	we collect pre-checks from the scheduled servers
+		like kernel version, mount points, os version and all
+	then
+	we perform patching once application team confirmed application is stopped
+	
+		just we run yum update if we are doing full patch
+				incase we are doing security patch then
+		we run yum update --security
+
+	once patch is completed then we reboot the server and do the post checks
+		we will verify post checks like is the latest kernel is updated or not also we see mount points 
+	once we do post validations then we ask application team to start the application
+
+	once they start and confirm everything is working fine then we close the CR (change request) Task.
+
+6. are you using any automation tool to perform patching ? 
+        
+        No, we are doing manually. we have satellite server for repos all our client machines are integrated with that so
+	we perform patching manually. integrated server and perform patching( yum update)
+
+7. how you can check latest available patches?
+	
+        yum check-update
+
+8. How to upgrade only kernel?
+     
+        yum update kernel
+	always reboot is required after kernel upgradation
+
+9. How you can upgraded only security patches, how frequently you upgraded the security patches?
+	yum update --security                               every month once
+
+10. How frequently you perform patching ? 
+	   every 3 months once
+
+11. after patching server is not booting up? how you can fix it?
+
+        it was giving grub error 
+        here L3 was not there and i fixed it my own
+
+	i took server into rescue mode with help of ISO image
+	and  recreated initramfs using dracut command and recreated grub also using grub2-mkconfig commands.
+	like
+	grub2-mkconfig -o /boot/grub2/grub.cfg
+        then i rebooted machine and it started normally.
+
+12. how you can fix the kernel panic error? 
+
+   In kernel stage / will mount but due to some reason not able to mount then kernel will go into panic
+					
+		situation 1 : may be wrong entry in /etc/fstab ==> take server into rescue mode and correct the entry in /etc/fstab
+		situation 2: may be / file system is corrupted ==> take server into rescue mode and repair the / file system
+									xfs_repair /dev/vg/rootlv
+		situation 3: may be initramfs is deleted? ==> take server into rescue mode and recreate the initramfs using dracut command
+		situation 4: wrong driver (package) is installed forcefully then it throws grub error ==> take server into rescue mode and un-install
+                            the older package and install supported package and recreate the initrafs also
+
+13. how you can role back the patch?
+    
+    3 solutions for role back
+			1. revert the snapshot. if we take snapshot before patching then we can merge that
+			2. Boot with older kernel and continue with the old kernel
+			3. role back the full patch, that means removing the packages which are upgraded as part of patching
+
+
+
+    2. Boot with old kernel and continue with the older kernel
+	step 1 : find out the default index
+			grubby --info=ALL
+	
+		by default latest kernel will be index=0
+				eg: rhel8.4 = 4.18.0-305   index=1
+				     rhel8.5 = 4.18.0-348  index=0
+
+	what we want to set default? 305 is the default
+			grubby --set-default 1
+		grubby --default-index
+
+    3. role back the full patch, that means removing the packages which are upgraded as part of patching
+	step 1 : boot with old kernel
+				eg: rhel8.4 = 4.18.0-305   index=1
+				     rhel8.5 = 4.18.0-348  index=0
+
+		grubby --set-default 1
+		reboot
+                now by default system will boot with older kernel (8.4).
+
+	step 2: make sure only 8.4 repository is enabled 
+		older repository should be enabled because we are doing downgrade not upgrade
+
+		vi /etc/yum.repos.d/local.repo
+			8.5 base os and 8.5 appstream 
+				enabled=0
+
+	step 3 : remove the kernel protection file
+		rm -rf /etc/yum/protected.d/systemd.conf
+	step 4 : using yum history we will do the undo the lastest patch
+				yum history
+		
+	find out the patch activity id and do the undo
+			yum history undo 4
+
+	step 5 : reboot the server
+
+14. can you explain how you can take server into rescue mode step by step?
+
+
+
+15. explain the steps how you can create lv from scratch?
+
+
+step 1 : first i will get the new disk with co-ordination of storage team, then
+step 2 : i will convert that disk as a pv using pvcreate command
+		eg: pvcreate /dev/disk1
+then
+step 3 : i willcreate vg using vgcreate command
+		eg: vgcreate vgname /dev/disk1
+then
+step 4 : I will create lv using lvcreate command
+	eg : lvcreate -L sizeforlv then -n nameforlv then vgname
+		lvcreate -L 50G -n lv02 appvg
+then
+step 5 : i will format that lv using any of the file system type
+		mkfs.xfs /dev/vgname/lvname
+		mkfs.xfs /dev/appvg/lv02
+then
+	i will create one folder and mount the lv to that directory
+			mkdir /application2
+		mount /dev/appvg/lv02  /application2
+step 6 : finally add file system details inside /etc/fstab for permanent mount
+		devicename     mountpointname   filesystemtype   permissions    backup   checkup
+		/dev/appvg/lv02  /application2      xfs           defaults        1       2
+
+if server is virtual
+=====================
+
+if server is virtual then i will open ticket with vmware team and get the new disk
+step 1 : first i will get the new disk with co-ordination of vmware team, then
+step 2 : i will convert that disk as a pv using pvcreate command
+		eg: pvcreate /dev/disk1
+then
+step 3 : i willcreate vg using vgcreate command
+		eg: vgcreate vgname /dev/disk1
+then
+step 4 : I will create lv using lvcreate command
+	eg : lvcreate -L sizeforlv then -n nameforlv then vgname
+		lvcreate -L 50G -n lv02 appvg
+then
+step 5 : i will format that lv using any of the file system type
+		mkfs.xfs /dev/vgname/lvname
+		mkfs.xfs /dev/appvg/lv02
+then
+	i will create one folder and mount the lv to that directory
+			mkdir /application2
+		mount /dev/appvg/lv02  /application2
+step 6 : finally add file system details inside /etc/fstab for permanent mount
+		devicename     mountpointname   filesystemtype   permissions    backup   checkup
+		/dev/appvg/lv02  /application2      xfs           defaults        1       2
+
+16. explain the steps for extend the partition space?
+
+step 1 : first i will verify enough space is availble or not in volume group
+		using vgs i can verify that
+	suppose i need 50 GB space for extend then i will see 50 GB space is available or not
+step 2 : if 50 gb is available then stright away i will extend the lv space using lvextend command that is
+		lvextend -L +50G absoulutepathoflv -r
+		lvextend -L +50G /dev/vgname/lvname -r
+only one command will extend the lv space if enough space is available in vg. 
+
+incase enough space is not available in vg then
+step 3 : i will cordinate with vmware or cloud team for new disk. if i have access then myself attach the new disk.
+then
+	convert that disk as pv using pvcreate command
+		eg: pvcreate /dev/sdd
+step 4 : then
+i will add this new pv into existing vg, using vgextend command
+	vgextend vgname /dev/sdd
+	now we have enough space in vg, so now i can extend the lv space using lvextend command
+			lvextend -L +50G /dev/vgname/lvname -r
+
+
+
+17. explain the steps for reduce the partition space for ext4 and xfs?
+
+xfs = if partition is created with xfs file system type then we can not reduce the lv space, but there is alternative method
+	that is first backup the lv, then remove lv, then create the lv with required size then restore the backup
+			backup the lv
+			delete lv
+			create lv with new size
+			restore backup
+ext4 = if partition is created with ext4 then we can reduce the partition space
+
+
+step 1 : backup the lv
+		xfsbackup -f /app1backup.dump /application1
+step 2 : then i will unmount the partition and remove the lv
+		umount /application1
+		lvremove /dev/appvg/lv01
+step 3 : once lv is removed then again i will create lv with required size
+		lvcreate -L 3G -n lv01 appvg
+	previously the lv size was 11 GB so we got requirement to reduce it to 3G
+	then  i will format and mount it
+step 4 : format and mount
+		mkfs.xfs /dev/appvg/lv01
+		mount /dev/appvg/lv01  /application1
+step 5 : now partition is created with 3 GB so we can restore the data from dump(backup)
+		xfsrestore -f /app1backup.dump  /application1
+
+there is no direct reduce method in xfs so followed this method.
+
+================how to reduce the lv space if lv is created with ext4 file system type
+	step 1 : unmount the partition
+			umount /application2
+	step 2 : repair the partition before reduce
+			e2fsck -f /dev/appvg/lv02
+fsck = file system checkup
+	step 3 : adjust the size for lv
+
+	the current lv size is 5 GB , that we want reduce it to 2GB
+			resize2fs -f /dev/appvg/lv02 2g
+	step 4 : reduce the lv
+			lvreduce -L -3000M /dev/appvg/lv02    or lvreduce -L -2.9G /dev/appvg/lv02
+	step 5 : mount it back the lv
+
+
+18. what is the difference between -l and -L in lvcreate command?
+     
+    L is for mentioning size of LV and l is for calculating size in PE's where as 
+
+19. what is pe and LE and what is the default size of PE?   4 MB
+   
+                  1PE = 4MB
+
+20. how we can check these lvs are part of which pv(disk)? 
+      
+        pvdisplay -m /dev/sdc  or lvs -o name,size,devices
+
+21. how we can identify is lv is normal lv or striped lv?   
+                
+               lvs --segment
+               linear = normal
+	       stripped = raid							
+
+22. explain the booting procedure?
+
+    Stage1	: BIOS
+===============
+	BIOS = Basic Input Output system
+
+	this stage purly belongs to hardware
+
+		
+		hardware
+		software
+	os is hardware or software? 	Software
+
+
+	As soon as we power on the server, it executes the 3 tasks 
+		task1. Post
+		task2. CMOS
+		task3. BIOS
+	these 3 tasks will execute in bios stage. 
+	let me eloborate each task
+
+		Task 1 : POST full form is power on self test
+=======================================================================
+		this post program will be there inside chip, it will start executing as soon as we power on the server.
+	post does the health checkup of all components which are connected to mother board like processor, hard disk, RAM....
+	if all the hardware components health is good then pass control to CMOS else it struck here only and give the error message
+
+		Task 2 : CMOS full form is Complementory metal oxide semi conductor
+=======================================================================================
+		cmos will collect the critical information from the server before goes down and again it will pass it back while
+			server is coming up.
+			critical information means it collects the date and time,hardware configuration and opened files
+			before server goes down.
+		
+		
+		cmos will collect the critical information from RAM(main memory) before server goes down and while server is coming
+		cmos will give critical information back to main memory.
+
+
+	today you will power off he laptop and switch laptop on 2025 jan 1st
+	what date and time you can see in laptop? todays time or 2025?  2025
+
+
+	cmos batery will supply the power to cmos chip so cmos will keep run in the background.
+
+	Task 3: BIOS
+=================================================================================================
+	  once cmos return the critical information back to main memory then bios will find out the device which device has the OS
+
+			in bios there are boot devices priority
+			====================================
+	bios will look for the os in boot devices
+			if os found in any of the boot device then pass control to MBR 
+			incase os not found then bios gives the error message like os not found
+
+	
+assum os is there in hard disk, so BIOS pass control to MBR
+
+
+Stage 2 : 	MBR( master boot recorder)
+==========================================
+	MBR is a small program, it will be in first sector of the device. the mbr program capacity is 512 bytes.
+		512 bytes = 1/2 kb
+
+MBR is a small program, it maintains the next stage information that is grub infomration, if grub is in good condition then pass
+		contol to grub.
+
+what mbr does? MBR maintains the next stage information that is grub information.
+		grub condition information will be inside MBR only.
+
+				if grub is good condition then pass control to grub 
+				incase grub is corrupted then mbr will give the error message like " grub error"
+
+
+
+which stage will give the grub error?
+		MBR
+	because MBR maintaining the grub information. 
+
+					MBR program will be inside first secotr(512 Bytes)
+								446 Bytes	primary boot load infrmation(grub)
+								 64 Bytes       partition table infrmation
+								  2 Bytes 	validator
+							===================================================
+								512 Bytes
+
+
+If grub is in good condition then MBR pass control to grub.
+
+Stage 3 : GRUB
+===========================================================
+	GRUB = Grand unified boot loader
+	
+	grub is a boot loader, it just load the kernel and pass control to respective kernel.
+
+
+	grub has capacity to maintain the installed kernels information, using grub we can choose which kernel we want to boot
+
+			8.4
+			8.5
+			8.7
+			8.9
+
+there are 4 kernels are installed, this time i want to boot with 8.5 and test something.
+	how we can achive? using grub we can choose which kernel has to load.
+
+
+	RHEL 3,4	= LILO
+	RHEL 5,6	= GRUB
+	RHEL 7,8,9	= GRUB2
+
+LILO = Linux loader
+GRUB = grand unfied boot loader
+		difference is in grub we can choose which kernel has to load during bootup
+		in Lilo we can not choose kernel during bootup. whatever is set by default that will boot
+		but in grub we can choose the kernel during bootup which kernel has to load.
+	which is interactive? grub
+
+
+	grub is a boot loader,we can choose which kernel has to load during bootup.
+	if there are multiple kernels are installed then grub will give option to choose which kernel you want to load
+
+example we set 8.5 is the default kernel then grub by default pass control to 8.5 kernel
+
+		grubby --set-default 0
+ 
+grub configuration file is /boot/grub2/grub.cfg
+			   /etc/default/grub
+
+Stage 4: Kernel
+==================
+	grub passed control to kernel whatever we set default in grub.
+
+		In kernel stage 3 sub tasks will be executed
+			one is loading drivers and modules
+			2nd one is mounting / file system in read only mode
+			3rd sub task is triggering or executing systemd program
+
+	
+	task 1 : Loading drivers and modules
+		=============================
+		first initramfs will get mounted then initrd programs will trigger to load the drivers and modules.
+
+	initramfs is a temparary / file system, during booting initramfs is the / file system to load drivers and modules.
+		first initramfs will mount and load the drivers using initrd programs.
+
+***** what is initramfs?
+	initramfs is a temparary / file system, it contains the configuration files, libraries and all. during bootup initramfs
+	act as / file system.
+		it will be there in /boot directory.
+
+	initramfs-4.18.0-305.el8.x86_64.img   =============> 8.4 OS in this initramfs 8.4 related kernel and libraries will be
+	initramfs-4.18.0-512.el8.x86_64.img   =============> 8.7 OS in this initramfs 8.7 related kernel and libraries will be
+***** incase initramfs file is deleted?
+	server will come to kernel stage and fail to boot because there is no tempary file system(initramfs file).
+	how to recover it?
+		Take server into rescue mode and recreate the initrafs using dracut command
+				dracut -f /boot/initramfs-kernelversion.img   kernelversion
+	Task 2: Mount / file system in read only mode
+	===============================================
+		once drivers and modules are loaded then / file system will mount in read only mode
+	when original / mounts then automatically initramfs will get unmounted.
+***** during bootup / will be in which mode?
+	read only mode
+	
+	kernel panic error:
+	==================
+			in kernel stage / will mount but due to some reason not able to moount then
+				kernel will go into panic
+					not able to mount / so i have to give kernel panic mode error.
+
+	why / is not mounting?
+		situation 1 : may be wrong entry in /etc/fstab ==> take server into rescue mode and correct the entry in /etc/fstab
+		situation 2: may be / file system is corrupted ==> take server into rescue mode and repair the / file system
+									xfs_repair /dev/vg/rootlv
+
+	kernel panic error: 
+		situation 3: may be initramfs is deleted? ==> take server into rescue mode and recreate the initramfs using dracut command
+		situation 4: wrong driver is installed forcefully
+				glibc-8.2.3.x86_64 right one
+			forcefully we install glibc-7.2.1.x86_64 this is older version which will not support current kernel
+		kernel will tell again i am in panic i will not support glibc-7.2.1
+
+	take server into rescue mode and un-install the older glibc and install supported glibc package and recreate the initrafs also
+***** how to un-install the old driver
+		driver is nothing package only
+			rpm -qa glibc      find out the package and remove it
+			rpm -ev pkgname
+
+
+	Task 3: trigger or execute the systemd program
+	===============================================
+	systemd is a first process or first program of the OS, systemd occupy the 1 process id.
+	this is the main program of the os
+		rhel 4,5,6 = initd
+		rhel 7,8,9 = systemd
+
+	what is the first program in rhel 8? systemd
+	what is the first program in rhel 5? initd
+***** what is the main difference between systemd and initd
+			systemd is a faster during bootup because all services will start paralely
+			initd is little bit slow compar to systemd becuase services will start sequencially one by one
+		systemd settings will be modified by command
+		initd settings will be modified by configuraiton files
+
+
+	once systemd program loads then systemd will verify the default target, the systemd program will pass control to
+		targets
+
+Stage5: targets or systemd
+===========================
+		systemd program passed control to targets
+
+			targets or runlevels
+		=======================================
+			target 0	= shutdown
+			target 1	= rescue/single user mode
+			target 2	= command line
+			target 3	=  graphical
+			target 4	=  reboot
+
+	target 0	= shutdown.target
+	target 1	= rescue.target
+	target 2	= multi-user.target
+	target 3	= graphical.target
+	target 4	= reboot.target
+
+organization what target your using?  multi-user.target
+
+when we set graphical.target as default then next boot time graphical related programs will load
+if we set by mistake as reboot.target? 
+		systemctl set-default reboot.target
+			next boot time continuesly reboot the server 
+	
+				give the login prompt and imediatly reboot
+
+
+	when i execute shutdown -r now which target will take control?  target4
+			shutdown -h now which target will take control?  target0
+
+	init 6 or reboot or shutdown -r all these will give control to target4
+
+once systemd give control to default target then that target programs will execute 
+
+	eg: default target is multi-user.target then all the startup programs will start and finally will give the login prompt
+
+23. what is the first process of operating system? 
+
+    rhel7 onwards = systemd(pid=0)   before rhel7 like 5,6= initd(pid=0)
+
+24. what is initramfs? what it contain?
+
+    initramfs is a temparary / file system, it contains the configuration files, libraries and all. during bootup initramfs
+	act as / file system.
+		it will be there in /boot directory.
+    Initramfs contains bootable files.
+
+25. how we can rebuild the initramfs?
+     
+    Take server into rescue mode and recreate the initrafs using dracut command
+				dracut -f /boot/initramfs-kernelversion.img   kernelversion
+	Task 2: Mount / file system in read only mode
+	===============================================
+		once drivers and modules are loaded then / file system will mount in read only mode
+	when original / mounts then automatically initramfs will get unmounted.
+
+26. difference between rhel 7 & 8?
+    
+
+
+27. how we can reset the root user password?
+    Run the passwd command: In the terminal, type the following command and press Enter
+    Enter the new root password:
+    Confirm the new root password: 
+    Password change successful:
+
+28. there are 2 servers between these 2 servers connection is not happening, how you can fix this issue?
+
+    Ping test: The first step is to use the "ping" command to verify that the two servers can communicate with each other. This will test the connectivity and response time between the servers.
+    Checking network connectivity by Etho aand also we have to check whether any firewall is blocking
+
+29. Classes of IP?
+
+     
+			IP Classes						private
+	==================================================================================================================
+	A	Class	= 1   - 126	Network( servers,mobile)		10.*.*.*	9.1.1.1     126-1(private) 125*255*255*255 =
+	B	Class	= 128 - 191	Network				172.16.*.*  to 172.31.*.*  15*255*255
+	C	Class	= 192 - 223	Network				192.168.*.* = 255 * 255 = 65025
+	D	Class	= 224 - 239	multicast(live channels or streaming)
+	E	Class	= 240 - 255	reseach and development
+
+30. what is the ssh,nfs,ftp,dhcp,ntp,dns,http,https port numbers?
+
+      SSH = 22
+      NFS = 2049
+      FTP = 20 (data transfer) 21 (connection establishment)
+      dhcp = 67,68
+      ntp = 123
+      dns = 53
+      http = 80
+      https = 443
+
+31. how you can configure the password less authentication between 2 servers
+
+step1 : generate key as a prasad user
+			ssh-keygen
+		press enter 3 times
+	step 2 : share the public key with remote machine
+			ssh-copy-id -i /home/prasad/.ssh/id_rsa.pub root@192.168.237.131
+				enter the root user password
+
+		password less is configured 
+
+32. how you can transfer files from one server to another server?
+
+using rsync we can trnasfer data between servers
+
+	we can transfer files/directories within the server or server to server.
+
+we have scp to transfer data between servers, again we need extra tool that is rsync
+	scp have few features
+
+
+33. what is nfs, how you can export the file system through nfs give step by step to export and mount it in client machine?
+
+Network file share   or network file system
+================================================================================================================
+
+we can share folder or file system to clients over the network
+
+	in one server we can export and other servers can use it
+
+	server 1 : 192.168.237.10
+	server 2 : 192.168.237.131
+
+=================server end=========================================
+i will export file system in 192.168.237.10 then i will access it from 131 server
+
+	step 1 : login to 192.168.237.10 and create one directory and keep some data
+			mkdir /application2
+			chmod 777 /application2
+			cd /application2
+				touch file1 file2 file3
+	step 2 : install the nfs-utils package
+			yum install nfs-utils
+			dnf install nfs-utils
+	step 3 : export the /application2 folder throug nfs
+			vi /etc/exports
+				/application2   *(rw,sync)
+	systemctl restart nfs-server
+	systemctl enable nfs-server
+exportfs
+=========================at client end================================
+
+	step 1 : check the connectivity with nfs server
+			ping 192.168.237.10
+			telnet 192.168.237.10 2049
+	step 2 : list out the exported file system at nfs server end
+			showmount -e 192.168.237.10
+	step 3 : create one directory and mount 
+			mkdir /app2
+			mount 192.168.237.10:/application2 /app2
+
+34. what is the difference between no_root_squash and root_squash?
+
+        ==> root_squash = means only nfs server root user is the owner on the nfs file system
+	==> no_root_squash = means nfs server root user and client machines root users also owner for the nfs file system.
+
+
+35. df -h command is getting struck, how you can fix it?
+
+ may be one of nfs file system not mounting so df -h is getting struck
+
+we have to find out which nfs file system have difficulty to mount and fix issue at nfs server end.
+
+	login nfs server and verify below things
+		posibility 1 : may be nfs server is down
+				if server is down then start it
+		possibility 2 : nfs server service is down
+				login to nfs server and start the nfs service
+						systemctl start nfs-server
+		possibility 3 : may firewalld is blocking
+				allow 2049 port in firewall or stop the firewall
+				systemctl stop firewalld
+
+	nfs service is not starting up? what may be the reason?
+		i am trying to start the nfs service but it is not coming up
+			may be mistakes in /etc/exports
+			
+				/appdata*(rw,sync)
+	the above entry is wrong
+				correct entry is   /appdata   *(rw,sync)
+			
+			another linux admin exporting one more file system 
+					/appdata2  *(rwx,syn)
+
+	it is a wrong entry, so it will effect to /appdata or not? no
+
+36. what is ntp/chrony, how you can integrate client machine with ntp or chrony?
+
+
+	NTP = Network Time protocol, it transfers date & time.
+
+chrony is the advanced service for NTP.
+
+1. configure chrony server
+2. integrate or join client machine with chrony server
+
+
+	1. configure chrony server
+========================================
+		step 1	:  install the chrony package
+				yum install chrony
+		step 2  : configure the chrony 
+			vi /etc/chrony.conf
+		
+add below 3 lines below of pool
+# Use public servers from the pool.ntp.org project.
+# Please consider joining the pool (http://www.pool.ntp.org/join.html).
+pool 2.rhel.pool.ntp.org iburst
+	server 192.168.237.10
+	allow 192.168.237.1/24
+	local  stratum 10
+
+	step 3: start the chronyd service
+			systemctl start chronyd
+			systemctl enable chronyd
+			systemctl stop firewalld
+			systemctl disable firewalld
+==================================================================
+client side
+==================================================================
+	step 1 : install the chrony package
+			yum install chrony
+	step 2 : integrate client machine with chrony server
+			vi /etc/chrony.conf
+# Use public servers from the pool.ntp.org project.
+# Please consider joining the pool (http://www.pool.ntp.org/join.html).
+# pool 2.rhel.pool.ntp.org iburst
+server 192.168.237.10
+
+	step 3 : restart the chrony service
+			systemctl restart chronyd
+			systemctl enable chronyd
+		how to check ntp status
+			chronyc status
+			chronyc tracking
+
+
+37. what is dns, how you can integrate client machine with dns server?
+
+	Domain name server
+
+dns does the name resolution name to ip and ip address to name
+======================================configuring dns server==================
+	step 1	:	Install bind and bind-utils packages
+			yum install bind bind-utils
+	step 2 : 	create the forward lookup zone file
+			vi /var/named/fw.pubcloud.org
+--------------------------------------------domainname = pubcloud.org what is my computer name = mdns ------------------------
+$TTL 86400
+@       IN SOA  mdns.pubcloud.org. root.pubcloud.org. (
+                                2023111601      ; serial
+                                        3600    ; refresh
+                                        1800    ; retry
+                                        604800  ; expire
+                                        86400   ; minimum
+)
+@               IN      NS      mdns.pubcloud.org.
+@               IN      A       192.168.237.10
+mdns       IN      A       192.168.237.10
+server1         IN      A       192.168.237.11
+www.site1       IN      A       192.168.237.131
+www.site2       IN      A       192.168.237.132
+----------------------------------------------------------------------
+	step 3 : modify the named.conf file
+----------------------------------------------------------------------
+options
+{
+        directory               "/var/named";           // "Working" directory
+        dump-file               "data/cache_dump.db";
+        statistics-file         "data/named_stats.txt";
+        memstatistics-file      "data/named_mem_stats.txt";
+
+        listen-on port 53       { 127.0.0.1; 192.168.237.10; };
+allow-query     { localhost; 192.168.237.0/24; };
+
+};
+
+        zone "pubcloud.org" IN {
+                type master;
+                allow-query     {any; };
+                file "fw.pubcloud.org";
+        };
+--------------------------------------------------------------------------------
+		step 4: we have to check is the syntax is correct
+			named-checkzone pubcloud.org /var/named/fw.pubcloud.org
+			named-checkconf /etc/named.conf
+			systemctl restart named
+			systemctl enable named
+	step 1 : add the dns server details in /etc/resolv.conf
+			vi /etc/resolv.conf
+				search	pubcloud.org
+				nameserver	192.168.237.10,slavednsip
+
+		nslookup pubcloud.org
+		nslookup mdns.pubcloud.org
+
+38. what is swap? how to create the swap? 
+
+
+swap is a virtual memory, it supports to RAM.
+
+If RAM is full then new tasks/processes will be redirected to swap, again ram will call the tasks once RAM is free.
+
+		1. partition based swap
+		2. file based swap
+
+	
+	step 1 : convert new disk as a pv
+			pvcreate /dev/sdc
+	step 2 : create the vg 
+			vgcreate sysvg /dev/sdc
+	step 3 : create lv
+			lvcreate -L 4G -n lv_swap  sysvg
+	
+	step 4 : format the lv or assign the any file system type
+			mkswap /dev/sysvg/lv_swap
+	step 5 : enable the swap
+			swapon /dev/sysvg/lv_swap
+	step 6 : add entry in the /etc/fstab
+			/dev/sysvg/lv_swap    swap    swap   defaults   0   0
+
+
+
+*** how to check swap details
+		free -m free -h free -g
+
+2. file based swap
+==================
+
+	step1 : find the partition where more free space is available
+			suppose in / partition more free space is available
+	step 2 : create one file with the size
+			dd if=/dev/zero of=/sfile bs=1M count=2k
+					bs = bytes per sec
+					count = is the size
+				1024k * 2k = 2 GB
+				=================
+if = input(source)
+of = output(destination)
+	
+	step 3 : set the permissions
+		chmod 600 /sfile
+	step 4 : format the swap
+			mkswap /sfile
+	step 5 : enable the swap
+	 	swapon /sfile
+	step 6 : add entry in /etc/fstab
+		vi /etc/fstab
+	/sfile		swap	 swap      defaults  0  0
+
+39. do you know about ulimits? how you can increase the ulimits?
+
+kernel maintain the limits
+
+max this many users only has to login to server, this is one of the limit
+max 5000 files only should open at a time, this is also one of the limit
+max 20000 processes only should run in this server.
+	if you want to you can increase this nproc value to 30000
+			now how many process can run in this server? 30000
+
+
+how to list out ulimit values
+=============================
+		ulimit -a
+how to increase or decrease number of files can open at a time
+		ulimit -n 2048
+	now 2048 files can be opened in this server
+	
+
+40. do you know kernel parameters? how can change the kernel parameters permanently?
+  
+kernel is a one of the core program in operating system, it does the memory management , tasks management and 
+	resources management and all.
+
+	How to list out all kernel parameters?
+======================================
+	sysctl -a
+***** how to list out kernel parameters and how you can set the kernel parameter
+	using sysctl -a i can list out kernel parameters
+based on requirement from db or application team i will change the kernel parameters using 
+		sysctl -w parameter = value
+then to save sysctl -p command i will run
+
+
+41. How you can analyze the server performance?
+
+there are 2 inbuilt commands to analyze the server performance
+			==============================================================
+					1. TOP
+					2. SAR
+using these 2 inbuilt commands we can analyze or verify the server performance
+
+42. one of the application team person opened incident like every at 11 PM server performance is degrading.
+		how you can identify the root cause and give the solution?
+
+Within 15mins need to give response to incident issue. Then we have to check in TOP Command because of which process like (high CPU utilization, memory utilization...) server is degrading. Then need to take action as per requirement of that particular process and give solution. 
+      
+43. how to check yesterday cpu and memory usage?
+By SAR command when can get previous server performance information
+
+
+44. explain about cron job and what are the fields?
+
+Min	hours	 dayinmonth	monthinyear	dayinweek      job/script/command
+	01       7	  02,03,04	12		*		reboot
+ 
+45. can we schedule cron job for seconds? if i want to setup cronjob for every 15 seconds once how i can do?
+
+Yes, we can sehedule cron job for every 15seconds. In scripting format we can run for every 15 sec.
+First need to write a shell script 
+vi /scripts/every15.sh
+		sh /scripts/rscript.sh  && sleep 15
+		sh /scripts/rscript.sh  && sleep 15
+		sh /scripts/rscript.sh  && sleep 15
+
+	crontab -e
+		*	*	*	*	* sh /scripts/every15.sh
+			
+save & exit, then crontab -l to view scheduled job.
+
+
+
+
+
+===============================Azure=================================================
+
+1. how you are deploying servers in azure?
+		
+Creating the resource group
+Creating Virtual network
+Next Security: allowing service
+Automatically by default IP address will be allocated 
+Any tags if required if no, then review & create.
+ 
+2. what is vnet and vnet peering?
+
+Vnet is nothing but virtual network where as it is a network to connect with the servers and vnet peering enables you to seamlessly connect two or more virtual networks. 
+
+3. how you can extend the disk space? give me the step by step?
+Step 1 :  go to azure portal and respective virtual machine
+Step 2 : go to disks category and select the respective disk which we decided to increase the size
+	Then click on size + performance and choose the whatever size we want and save it
+Step 3 : come to server and run below 2 commands to reflect new size
+	echo 1 > /sys/block/sdc/device/rescan
+	pvresize /dev/sdc
+	lvextend –L +20G /dev/appvg/lv01 –r
+
+
+4. what is nsg? how you can write the nsg?
+
+NSG( network security group) machine level firewall
+		or
+	subnet level firewall
+		writting the rules
+			like allowing port and denying port based on request or requirement
+
+5. how you can scaleup the machine size ?
+
+Step 1 :  take machine backup
+Step 2 : request application or database team to stop the associated application inside this server
+Step 3 : De-allocate(stop) the server
+Step 4 :  scale-up the machine size based CR
+Step 5 : Start the server
+Step 6 : validation is the cpu and RAM is reflected at os or not
+Step  7:  Start the application and db
+
+6. explain about azure backup, how you can take the machine backup?
+
+i) Create recovery service vault
+	ii) Creating Backup policy
+	iii) enabling backup for virtual machines
+	iV) Triggering backup instant backup for virtual machines
+	V) Restoring the latest restore point
+
+7. how you can restore the only os disk using snapshot ?
+
+Step 1 :  Create new disk using existing snapshot
+	Step 2 : swap the OS disk with new OS disk
+
+8. what is the difference between blob and file share?
+ 
+File share : samba and NFS file systems
+		Here we can keep structural data means normal files, directories, only few formats it supports.
+Blob : we can keep any data I mean it can support unstructured data also.
+	It can support all type of files.
+File share = Low latency, High durable & reliable
+			It supports only the structural data
+	Blob = it will support un-structured data
+		It is cost effective compare to file share.
+
+9. what is the difference between availability set and availability zone
+
+          Availability zone : vm run in multiple data centers. Incase any one data center issue still server will be access because we set availability zone is 2.
+                              That means server will maintain in 2 data centers.
+
+         Availability set : one OS or vm running in multiple disks within same data center. Incase any one disk fails still os will run with other disk.
+
+10. is it possible to increase azure file share and azure blob container quota?
+
+     Yes it is possible to increase azure file share with nfs file system and mounting in linux server.
+and azure blob container and configure azcopy in linux server to transfer data to blob.
+
+
+
+================================ANSIBLE============================
+
+1. what you know about ansible
+
+   Ansible is a tool, using anisble we can do the configuration management in remote machines.
+
+2. is it push based or pull based configuration tool?
+
+   Push based
+
+3. on which port ansible will connect with client machine?
+
+Ansible controller node will go client machine through ssh service(22) and execute module(task) and get the output.
+
+4. explain any one playbook?
+
+first = validation
+	ansible-playbook playbookname.yml –check
+second = run
+	ansible-playbook playbookname.yml 
+
+disable anonimos users in vsftpd
+
+
+
+=============================Terraform============================
+1. what you know about terraform?
+
+Terraform allows you to describe your complete infrastructure in the form of code. Even if your servers come from different providers such as AWS or Azure, Terraform helps you build and manage these resources in parallel across providers.
+
+2. how your deploying servers using terraform?
+
+Create the directory.
+Create the Virtual Private Cloud network and subnet.
+Create the Compute Engine VM resource.
+Initialize Terraform.
+Validate the Terraform configuration.
+Apply the configuration.
+
+============================Shell scripting==========================
+
+
+1. what is shebang? 
+
+Shebang is nothing but defining run time environment for script
+Whatever we define shebang in the first line using that only script will be executed.
+
+Eg : if we set #! /bin/bash In the first then below lines or script will execute using bash shell only.
+That’s why we call shebang is a run time environment.
+
+2. can script can run without shebang line inside script?
+
+
+Yes script can execute without shebang
+It take the default shell is a shebang line and execute the script.
+
+3. one package needs to install in 100 servers, how you can do this task , can you explain the steps?
+
+
+4. how we can set the debug mode?
+
+While running script we can include -x in between
+		Eg: sh -x script.sh
+		Inside script also we can define the debug mode
+Eg:
+#! /bin/bash
+set -x
+-------
+-------
+-------
+-------
+set +x
+
+5. how we can see previouse command execution status?
+
+	$?
+	Echo $?
+	0 = previous command was success
+	127 = previous command failed due to command not found error
+	130
+
+6. explain any one script which you developed?
+
+In 10 servers I want to do house cleaning in /var/log partition. That is delete older than 10 days logs from /var/log directory
+Jump server means from this server there will be a connectivity to all servers
+Step 1 : login to jump server and create file with server names or ips
+		Vi /tmp/slist
+		192.168.237.11
+		192.168.237.12
+		192.168.237.14
+Step 2 : run the for loop to clear older than 10 days logs from all servers
+	for i in `cat /tmp/slist`
+do
+ssh root@$i "find /var/log -type f -mtime +10 -exec rm -rf {} \;"
+done
+
+for i in `cat /tmp/slist`
+do
+ssh root@$i "yum install vsftpd -y; systemctl restart vsftpd"
+done
+
+for i in `cat /tmp/slist`
+do
+ssh root@$i "yum update https -y; systemctl restart httpd"
+done
+
+
+7. what is sed?
+
+stream editor  or string editor
+
+usually if we want to modify  file content using vi we open that file and go to respective line and do the modification
+		like deleting string or adding some content all these
+without open the file we can modify the file content using sed command
+
+eg : 	sed -i 's/existingword/newword/g' /filename
+
+8. what is awk?
+
+awk : using awk we can print column wise output from the file.
+Eg: there are 10 columns in that in need 1st column and 6th column using awk it can possible
+
+eg :
+awk -F: '{print $1 "="$3}' /etc/passwd
+awk -F: '{print NR,$1 ";"$3}' /etc/passwd
+df -h |awk '{print $6 "\t" $5}'
+
+============================================================================================================================================================================================
+
+1. if you want to do any change implementaion like kernel parameter adjustment, new disk attach, any configuration changes in 
+	server what process your organization following?
+		we are following ITIL process
+	we will open first RFC and ask our project manager to include this RFC in list
+	then we our pmo will schedule meeting to prepare CR, we prepare CR and do the TAB meeting, once CR os review in TAB 
+	then we put CR in CAB meeting, once CR is approved in CAB meeting then we implement the change as per schedule time.
+
+
+
+
+
+
+
+
+
+
+============================================================================================================================================================================================
+
+As you know my self prasad babu, I have 3 years 4 months experience as a Linux administrator.
+after my graduation i have joined in IBM COMPANY, here i deployed to XYZ client after my training completion.
+here my role is L2 support engineer , here we are giving 24/7 support with rotational shifts.
+for this client there are 1000+ servers. 90 % servers are running in Azure and few servers still in on-prem(Vcenter).
+here Linux servers are running with SuSE 15 and Redhat 8.8 OS.
+
+coming to my role in this project. 
+we are part of operational team.
+our team will give 24/7 support with rotational shifts. we work on incidents which are coming to our Unix queue.
+Based on criticality and SLA we resolve the issues.
+we keep monitor the queue and acknowledge the tickets.
+we get like
+High cpu utilization tickets and High memory utilization tickets.
+and disk full alerts, extending partition space tasks and creating partitions.
+and exporting file system through nfs service and mounting in client machines.
+and mounting the Azure file share volume in linux servers these kind of tickets we get.
+also we do the server deployment in azure and vmware platforms.
+we get the ticket with build sheet. first we acknowledge the ticket and download buildsheet.
+if they mentioned platform is azure then we deploy server in azure platform using terraform. if they mentioned platform is
+VMWARE then we deploy server in vcenter.
+
+coming to azure tasks, here we fill the Variables file based on build sheet requirements and then we deploy server.
+once server is deployed then we do the post build activities like creating partitions as per build sheet and
+create the users and groups as per build sheet then we grant the sudo privilages to application users and grant the crontab access
+based on build sheet.
+
+we handle azure tasks like
+creating disks as per request
+extending disk space if the ask to extend the partition space
+enabling backup for virtual machine and triggering backup for virtual machine
+taking snapshot before any maintanace activity.
+we do create NSG rules
+we create vnet peering between vnets. we do all these things in azure.
+
+============================================================================================
+
+==============================
+Explain the patching procedure
+==============================
+actually here for production servers we are doing every 3 months once in weekends with approval.
+
+first we join in scheduled meeting which is scheduled by PMO team.  then we start infra activities like
+taking snapshot and pre-checks from scheduled servers. then we ask monitoring team to disable the alerts. 
+then we ask application team to stop the respective application. once they stop we do the servers reboot before patching.
+once server is up then we perform the patching .
+if server is redhat then we make sure server is integrated with satelite server
+if server is suse then we make sure server is integrated with suma server.
+then we run the yum update if server is redhat 
+if server is SuSE then we run zypper update
+then we monitor the patching progress
+then we reboot the server after patching .
+once server is up then we verify the kernel version and mount points and all also we take the post checks and put in note pad file
+for future reference.
+then we hand over server to application team to start the application.
+
++++++++++++++++++++++++++++++++++*************************************
+did you notice any issues during patching?
+#########################################
+yes, in few servers we get conflict packages error. in that case i will mention those packages in exclusion list and proceed 
+with patching
+	yum update --exclude=java-*,glibc*
+
+reverse question from panel like ? How you can exclude those packages from patch?
+################################################################################
+yum update --exclude=pkgnames
+
+application team telling application is not starting with latest patch and asking to role back the patch? how you can do?
+========================================================================================================================
+first i will set the previous kernel as a default boot kernel in next boot for that i will run
+	grubby command
+	eg :  grubby --set-default 1
+then i will reboot the server
+now server is booted with old kernel so i can role back the latest patch for that 
+i will run the yum history
+here i will note down the patch yum history id
+then i will run the
+		yum history undo patchid
+
+========================================================================================================================
+Server is not coming up after patching, how you can fix this issue
+##################################################################
+First i will check error message in serial consol and take server into rescue mode
+once server is in rescue mode then i will start troubleshoot based on error message.
+if its giving kernel panic error then i will rebuild the initramfs using dracut command
+eg:  dracut -f /boot/initramfs-kernelversion.img  kernelversion
+then i will recreate the grub also
+	uging grub2-mkconfig -o /boot/grub2/grub.cfg
+then will reboot the server. 
+
+if error is related file system related issue then we repair the file system in rescue mode and reboot.
+========================================================================================================
+
+Tell me recently faced problem which you can proudly you did your own
+=====================================================================
+I was in night shift and oracle team opened P1 issues
+the issue was transactions are failling 
+
+even they were not able to login to system using oracle user. 
+i got clue from error message like
+  process limit is exceeded for oracle user,  then imediatly i logged in to server using my username and switched to root 
+
+and verified soft and hard limit of nproc 
+
+	here there was less hard limit then imediatly i increased 
+		hard limit of nproc in /etc/security/limits.conf then asked oracle team to test the trasactions. 
+they confirmed trasactions are going through.
+
+i got appreciation email from db team manager also on this issue.
+=================================================================================
+
+
+what is sticky bit
+==================
+using sticky bit we can provide full access to every user but we can control modify access on others data.
+
+only owner will have full rights on his data, but he can not modify or delete others data.
+by default sticky bit applied on /tmp  here all the users can store their data but each other can not delete others data.
+
+using +t we can apply the sticky bit
+eg : chmod +t /directory
+=======================================================================================================================
+
+we deleted some files but that space is not released from partition still it is showing full.
+=============================================================================================
+may be we deleted files when the process is using that file.
+so it will not appear that file but still backend process is using that file, so it did not release the space, so
+first we have find out the process id which is using that file
+
+we can run
+     lsof +D /directory | grep -i deleting   or lsof +D /directory | grep -i deleted
+once we find the process id then we can kill that process id with approval. then it can release the free space.
+==========================================================================================================
+
+
+			3 shift how 8 members will manage
+			=================================
+	its a us client project
+		morning shift only 1 engineer sun,mon , tue,wen,thurs 2
+		afternoon shift onl 1 engineer
+		night shift 2 engineers
+
+
+ANF = Azure netapp file share (NFS)
+=====================================
+netapp is storage based company
+they developed one application that ANF, using anf we can create the nfs file system.
+create ANF volume and mounting in linux server
+	
+every day at 1 AM one of the file should be downloaded using FTP service
+------------------------------------------------------------------------
+below script at 1:10 am it will run and see is the file is exist or not if not then send mail notification to few members
+==========================================================================================================================
+vi /monitoring.sh
+#! /bin/bash
+d=`date +"%d-%m-%Y"`
+if [ -f /app1/transactions/daily/cumulativestmt-$d.csv ]; then
+echo "File has been downloaded" |mailx -s " File has been downloaded"  prasad.sanepalli@gmail.com
+else
+echo " file not yet downloaded, please login and check" | mailx -s " File not yet downloaded"  prasad.sanepalli@gmail.com
+fi
+
+
+we scheduled this script in cron at 1:10 and 2 am also
+
+crontab -e
+10 01  * * * sh /monitoring.sh
+01 02  * * * sh /monitoring.sh
+===================================================================================================
+sudo
+visudo
+-------
+%groupname    ALL=NOPASSWD:  ALL
+
+=================================================================
+1. what are the application that are running in our server? or what are the applications that you project supporting
+	SAP = they are developing code in sap abap , we install pre-requisites for them and we support them, we will not get exactly
+	what application they are developing.
+		we have web servers, applications and db servers.
+	java = JRE(java runtime environment)
+	
+	I think i should disclose more information about project but i can tell few things what i am doing
+			one of the application for that near to 1000+ servers are there few web servers and application servers
+			and few are data base servers.
+			application is running java we install java related prequisites and hand over them later they configure.
+
+	
+	Ahold = is a retail based company they have near to 1000 + servers we are supporting for that.
+	TKS  = it is steel manufacturing company they have near to 2000 thousand servers, we are supporting for that.
+	IKEA = 
+	huntsman =
+
+2. what is the db your using in your project?
+		oracle
+		ms sql
+		sap = hana
+3. what will you do when the application team reports to you that the server is down?
+		CMDB
+		zabix
+		service now
+	inventory management tools
+	==========================
+			inventory means
+				servers(servername, ram,cpus,in which data center server is there, when it deployed, downtime contact
+					list)
+						downtime contact list = appteam@xyz.com
+					they are responsible team for this server.
+
+	first we will start the server and ask team to verify application functionality. if they say everything is working fine now.
+	then we will start the post murder steps like
+		why it went down, at what time it wend down and all.
+			if we could not able to identify the root cause for server down then we open case with OS vendor.
+				
+				redhat server = open case with redhat 
+				suse = open case with suse
+4. have you faced any issues when you try to upgrade or install a package? how you rectified?
+	yum install packagename
+		1. conflict error = that means higher version or lower version is already install so we have use yum upgrade
+			conflict error will come incase already it is there
+		while upgrading getting same error may be already heighest version is installed
+		2. sometime we get package not found in repository
+			that means the package is not there in repository to install
+		so we have to download it manually and install 
+	
+		3. sometime we faced problem like already 32 bit package is installed not possible to install 64 bit package
+			for this until we remove that 32 bit one we can not install 64 bit package.
+5. what is your day to day activities?
+	you will work shiftwize
+		morning shift starts at 6 AM to 3 PM
+		second shift  start at 2:00 PM to 11 PM
+		night shift start at   10 PM to 7 AM
+
+		shift handover meeting
+			morning shift and afternoon shift people will join and morning shift guys will give hand over to afternoon
+				shift engineers
+			afternoon shift and nightshift guys will join in shift handover meeting and give handover to night shift
+			nightshift and morning shift guys will join in shift handover meeting and give handover 
+
+	we join in shift handover meeting and take the handover from previous shift and start working on pending tasks
+		and tickets which are comming to our queue.
+
+	we keep monitor the queue and work on the tickets.
+==========================================================================================================================
+6. which servers your supporting? are they physical or virtual
+	we are supporting azure cloud vms and vmware vm's
+		we don't have any physical servers
+
